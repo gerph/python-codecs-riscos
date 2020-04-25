@@ -10,7 +10,7 @@ def main():
     binary = b'abcdefg\x80\xa5\xb8'
 
     # Decode
-    text = binary.decode('riscos-latin3')
+    text = binary.decode('riscos-latin3', 'replace')
     print(repr(text))
 
     # Encode

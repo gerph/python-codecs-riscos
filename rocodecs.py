@@ -61,6 +61,11 @@ class RISCOSAlphabet(object):
                 self.decode_table[codepoint] = value
         self.encode_table = {char: (index) for index, char in enumerate(self.decode_table)}
         self.codec = codecs.CodecInfo(self.encode, self.decode, name=name)
+        self.decode_readers = {
+                'strict': self.decode_strict,
+                'ignore': self.decode_ignore,
+                'replace': self.decode_replace,
+            }
 
     def __repr__(self):
         return "<{}(alphabet={}, name={})>".format(self.__class__.__name__,
@@ -74,11 +79,28 @@ class RISCOSAlphabet(object):
     # In python 2, it's a str, so enumerating it returns individual characters as strings.
     # In python 3, it's a bytes, and enumerating it returns the ordinal value.
     if sys.version_info.major == 2:
-        def decode(self, binary):
-            return (''.join(self.decode_table[ord(x)] for x in binary), len(binary))
+        def decode(self, binary, errors='strict'):
+            decoder = self.decode_readers[errors]
+            return (''.join(decoder(ord(x)) for x in binary), len(binary))
     else:
-        def decode(self, binary):
-            return (''.join(self.decode_table[x] for x in binary), len(binary))
+        def decode(self, binary, errors='strict'):
+            decoder = self.decode_readers[errors]
+            return (''.join(decoder(x) for x in binary), len(binary))
+
+    def decode_strict(self, c):
+        nc = self.decode_table[c]
+        if nc is u'\ufffd':
+            raise UnicodeDecodeError("Cannot decode character {!r} in encoding '{}'".format(nc, self.name))
+        return nc
+
+    def decode_ignore(self, c):
+        nc = self.decode_table[c]
+        if nc is u'\ufffd':
+            return ''
+        return nc
+
+    def decode_replace(self, c):
+        return self.decode_table[c]
 
 
 class RISCOSUTF8(RISCOSAlphabet):
