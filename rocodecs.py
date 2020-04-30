@@ -62,9 +62,14 @@ class RISCOSAlphabet(object):
         self.encode_table = {char: (index) for index, char in enumerate(self.decode_table)}
         self.codec = codecs.CodecInfo(self.encode, self.decode, name=name)
         self.decode_readers = {
-                'strict': self.decode_strict,
-                'ignore': self.decode_ignore,
-                'replace': self.decode_replace,
+                'strict': self._decode_strict,
+                'ignore': self._decode_ignore,
+                'replace': self._decode_replace,
+            }
+        self.encode_readers = {
+                'strict': self._encode_strict,
+                'ignore': self._encode_ignore,
+                'replace': self._encode_replace,
             }
 
     def __repr__(self):
@@ -72,8 +77,21 @@ class RISCOSAlphabet(object):
                                                    self.alphabet,
                                                    self.name)
 
-    def encode(self, text):
-        return (bytes(bytearray(self.encode_table.get(char, '?') for char in text)), len(text))
+    def encode(self, text, errors='replace'):
+        encoder = self.encode_readers[errors]
+        return (bytes(bytearray(encoder(char) for char in text)), len(text))
+
+    def _encode_strict(self, c):
+        nc = self.encode_table.get(c, None)
+        if nc is None:
+            raise UnicodeEncodeError("Cannot encode character {!r} with encoding '{}'".format(c, self.name))
+        return nc
+
+    def _encode_ignore(self, c):
+        return self.encode_table.get(c, '')
+
+    def _encode_replace(self, c):
+        return self.encode_table.get(c, '?')
 
     # 'bytes' works differently between python 2 and python 3.
     # In python 2, it's a str, so enumerating it returns individual characters as strings.
@@ -87,19 +105,19 @@ class RISCOSAlphabet(object):
             decoder = self.decode_readers[errors]
             return (''.join(decoder(x) for x in binary), len(binary))
 
-    def decode_strict(self, c):
+    def _decode_strict(self, c):
         nc = self.decode_table[c]
         if nc is u'\ufffd':
-            raise UnicodeDecodeError("Cannot decode character {!r} in encoding '{}'".format(nc, self.name))
+            raise UnicodeDecodeError("Cannot decode character {!r} from encoding '{}'".format(c, self.name))
         return nc
 
-    def decode_ignore(self, c):
+    def _decode_ignore(self, c):
         nc = self.decode_table[c]
         if nc is u'\ufffd':
             return ''
         return nc
 
-    def decode_replace(self, c):
+    def _decode_replace(self, c):
         return self.decode_table[c]
 
 
